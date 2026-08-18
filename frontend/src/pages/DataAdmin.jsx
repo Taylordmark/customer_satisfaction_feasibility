@@ -93,7 +93,14 @@ export default function DataAdmin() {
     <div>
       <div className="page-header">
         <h1>Data</h1>
-        <p>Everything the feasibility pages compute from — warehouses, teams, customers, packages, transport, and refuelers. Edits here take effect immediately across all five assessment pages.</p>
+        <details>
+          <summary>How this page works</summary>
+          <ul>
+            <li>Source data for all five assessment pages — warehouses, teams, customers, packages, transport, and refuelers.</li>
+            <li>Every field here is editable.</li>
+            <li>Edits take effect immediately across all five assessment pages — nothing is cached.</li>
+          </ul>
+        </details>
       </div>
 
       <div className="data-nav-tabs">

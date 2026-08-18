@@ -93,8 +93,16 @@ export default function Page4Support() {
   return (
     <div>
       <div className="page-header">
-        <h1>4. What support does delivery need</h1>
-        <p>For each customer: which capable vehicles reach them on their own fuel, and which only get there with a refueler — and which tankers can provide that support. Out-of-service vehicles and refuelers are shown grayed out rather than hidden. Click a tanker to pin that exact pairing as a manual mission. The controlling team is shown per vehicle, since tasking authority follows from the location/vehicle combination.</p>
+        <h1>What support does delivery need</h1>
+        <details>
+          <summary>How this page works</summary>
+          <ul>
+            <li>Per customer: which vehicles reach them unaided, which need a refueler, and which tankers can supply that support.</li>
+            <li>Out-of-service vehicles and refuelers show grayed out, not hidden.</li>
+            <li>Click a tanker to pin that exact vehicle + refueler pairing as a manual mission.</li>
+            <li>Controlling team is shown per vehicle — tasking authority follows the location/vehicle combination.</li>
+          </ul>
+        </details>
       </div>
 
       {error && <div className="error-banner">{error}</div>}

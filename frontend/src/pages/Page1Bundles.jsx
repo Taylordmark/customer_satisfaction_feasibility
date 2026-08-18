@@ -66,8 +66,16 @@ export default function Page1Bundles() {
   return (
     <div>
       <div className="page-header">
-        <h1>1. What satisfies each customer</h1>
-        <p>One row per customer (ordered by priority rank, 1 = highest), one column per package type. Each cell is the quantity of that package that would satisfy the customer on its own — the columns are alternatives, and fully delivering any one of them is enough. Use <strong>In plan</strong> to exclude a customer from today's problem, and <strong>★</strong> to pin them as must-satisfy.</p>
+        <h1>What satisfies each customer</h1>
+        <details>
+          <summary>How this page works</summary>
+          <ul>
+            <li>One row per customer (ranked by priority, 1 = highest), one column per package type.</li>
+            <li>Each cell is the quantity needed — columns are <strong>alternatives</strong>, so fully delivering any one option satisfies the customer.</li>
+            <li>Uncheck <strong>In plan</strong> to exclude a customer from today's problem.</li>
+            <li>Click <strong>★</strong> to pin a customer as must-satisfy.</li>
+          </ul>
+        </details>
       </div>
 
       {error && <div className="error-banner">{error}</div>}

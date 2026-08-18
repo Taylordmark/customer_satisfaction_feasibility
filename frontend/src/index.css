@@ -375,3 +375,50 @@ tr:last-child td { border-bottom: none; }
   color: var(--white);
   border-color: var(--navy);
 }
+
+/* ---------- Page-header collapsible descriptions ---------- */
+.page-header details {
+  margin-top: 6px;
+  max-width: 680px;
+}
+
+.page-header summary {
+  color: var(--muted);
+  font-size: 14.5px;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+}
+
+.page-header summary::-webkit-details-marker {
+  display: none;
+}
+
+.page-header summary::before {
+  content: "▸ ";
+  display: inline-block;
+}
+
+.page-header details[open] summary::before {
+  content: "▾ ";
+}
+
+.page-header summary:hover {
+  color: var(--navy);
+}
+
+.page-header details ul {
+  color: var(--muted);
+  font-size: 14.5px;
+  line-height: 1.55;
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.page-header details li {
+  margin-bottom: 4px;
+}
+
+.page-header details li:last-child {
+  margin-bottom: 0;
+}

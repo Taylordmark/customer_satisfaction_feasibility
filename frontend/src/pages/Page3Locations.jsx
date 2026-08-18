@@ -49,8 +49,17 @@ export default function Page3Locations() {
   return (
     <div>
       <div className="page-header">
-        <h1>3. Where it can actually come from</h1>
-        <p>Combines stock on hand with reachability. A warehouse is <strong>feasible</strong> for a package only if it has stock covering the full quantity needed AND at least one in-service asset there can carry that package type and reach the customer — directly, or with a refueler. A warehouse with some stock but not enough is <strong>partial</strong> — the solver may still use it, split across sources. A customer is deliverable if any one of their bundle options has a feasible source. Out-of-service vehicles are shown grayed out rather than hidden, so the drill-down still reflects physical capability. Use <strong>pin source</strong> to lock a customer's delivery to a specific warehouse — the optimizer must then serve them from there.</p>
+        <h1>What locations have the packages and transport to satisfy</h1>
+        <details>
+          <summary>How this page works</summary>
+          <ul>
+            <li>Combines stock on hand with reachability, per warehouse.</li>
+            <li><strong>Feasible</strong> = full stock for the quantity needed AND an in-service asset there that carries it and reaches the customer, directly or via refueler.</li>
+            <li><strong>Partial</strong> = some stock but not enough — the solver may still use it, split across sources.</li>
+            <li>A customer is deliverable if any one bundle option has a feasible source.</li>
+            <li>Out-of-service vehicles show grayed out, not hidden. Click <strong>pin source</strong> to lock a customer's delivery to one warehouse.</li>
+          </ul>
+        </details>
       </div>
 
       {error && <div className="error-banner">{error}</div>}

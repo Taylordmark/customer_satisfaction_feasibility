@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
+import { buildPinModel, validOptions, normalizeDraft } from "../pinFilter";
 
 const EMPTY_DRAFT = { customer_id: "", asset_id: "", refueler_id: "", package_type_id: "", source_warehouse_id: "" };
+
+const PIN_FIELD_META = [
+  { key: "customer_id", label: "Customer", placeholder: "— customer —" },
+  { key: "package_type_id", label: "Option", placeholder: "— any option —" },
+  { key: "asset_id", label: "Vehicle", placeholder: "— any vehicle —" },
+  { key: "refueler_id", label: "Refueler", placeholder: "— any refueler —" },
+  { key: "source_warehouse_id", label: "Source", placeholder: "— any source —" },
+];
 
 function clampPct(raw) {
   if (raw === "") return "";
@@ -21,6 +30,7 @@ export default function Page5Schedule() {
   const [packageTypes, setPackageTypes] = useState([]);
   const [warehouses, setWarehouses] = useState([]);
   const [pins, setPins] = useState([]);
+  const [pinModel, setPinModel] = useState(null);
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [result, setResult] = useState(null);
   const [lastRunInputs, setLastRunInputs] = useState(null); // { cap, quotasKey, pinsKey } used to produce `result`
@@ -41,8 +51,10 @@ export default function Page5Schedule() {
       api.get("/settings/"), api.get("/customer-types/"), api.get("/allocation-policies/"),
       api.get("/customers/"), api.get("/assets/"), api.get("/refuelers/"),
       api.get("/package-types/"), api.get("/warehouses/"), api.get("/planned-missions/"),
+      api.get("/feasibility/page3"), api.get("/feasibility/page4"),
     ])
-      .then(([settings, types, policies, custs, as, rf, pts, whs, pm]) => {
+      .then(([settings, types, policies, custs, as, rf, pts, whs, pm, p3, p4]) => {
+        setPinModel(buildPinModel(p3, p4));
         setCap(settings.default_daily_cap);
         setDefaultDailyCap(settings.default_daily_cap || 0);
         setCustomerTypes(types);
@@ -129,6 +141,50 @@ export default function Page5Schedule() {
     }
   }
 
+  const includedCustomerIds = customers.filter((c) => c.included).map((c) => c.id);
+  const pinDomains = {
+    customer_id: includedCustomerIds,
+    package_type_id: packageTypes.map((k) => k.id),
+    asset_id: assets.map((a) => a.id),
+    refueler_id: refuelers.map((f) => f.id),
+    source_warehouse_id: warehouses.map((w) => w.id),
+  };
+
+  function pinFieldOptions(field) {
+    if (!pinModel) return pinDomains[field];
+    return validOptions(pinModel, includedCustomerIds, draft, field, pinDomains[field]);
+  }
+
+  function setPinField(field, value) {
+    const next = { ...draft, [field]: value };
+    setDraft(pinModel ? normalizeDraft(pinModel, includedCustomerIds, next, pinDomains, field) : next);
+  }
+
+  function pinFieldDisplay(field, v) {
+    if (field === "customer_id") {
+      const c = customers.find((x) => x.id === v);
+      return c ? `#${c.priority_rank} ${c.label}` : v;
+    }
+    if (field === "asset_id") {
+      const a = assets.find((x) => x.id === v);
+      return a ? `${a.id} (${a.vehicle_type})` : v;
+    }
+    if (field === "package_type_id") {
+      const k = packageTypes.find((x) => x.id === v);
+      return k ? k.name : v;
+    }
+    if (field === "source_warehouse_id") {
+      const w = warehouses.find((x) => x.id === v);
+      return w ? w.label : v;
+    }
+    return v;
+  }
+
+  const setPinFields = PIN_FIELD_META.filter((f) => draft[f.key]);
+  const unsetPinFields = PIN_FIELD_META.filter((f) => !draft[f.key]);
+  const tankerNeedsVehicle = !!draft.refueler_id && !draft.asset_id;
+  const pinAddDisabled = !draft.customer_id || tankerNeedsVehicle;
+
   function pinDescription(p) {
     const cust = customers.find((c) => c.id === p.customer_id);
     const parts = [cust ? cust.label : p.customer_id];
@@ -145,13 +201,21 @@ export default function Page5Schedule() {
   return (
     <div>
       <div className="page-header">
-        <h1>5. How many deliveries fit in a day</h1>
-        <p>Pin any missions you've already decided on, set the daily cap and per-type mission share floors, then run. Pins are hard constraints that count against the cap and quotas; the optimizer fills the remaining freedom, solved once per objective so you can compare and choose.</p>
+        <h1>How many deliveries fit in a day</h1>
+        <details>
+          <summary>How this page works</summary>
+          <ul>
+            <li>Pin any missions already decided, set the daily cap and per-type mission share floors, then run.</li>
+            <li><strong>Pins are hard constraints</strong> — they count against the cap and quotas.</li>
+            <li>Manual-mission dropdowns only offer values that still work together (in-service, reaches, carries, fully stocks).</li>
+            <li>Floors are <strong>minimum</strong> mission shares per customer type; the optimizer fills the rest, solved once per objective so you can compare.</li>
+          </ul>
+        </details>
       </div>
 
       <div className="panel">
         <div className="panel-title">Manual missions</div>
-        <div className="panel-subtitle">Only Customer is required — anything left blank stays the optimizer's choice. Conflicting pins make the run refuse and explain rather than being silently dropped.</div>
+        <div className="panel-subtitle">Pick in any order — each dropdown only offers values that can still work with what you've already chosen (an in-service vehicle that reaches, carries the option, and a source that fully stocks it). Only Customer is required; anything left blank stays the optimizer's choice.</div>
         {pins.length > 0 && (
           <div style={{ marginBottom: 12 }}>
             {pins.map((p) => (
@@ -170,28 +234,58 @@ export default function Page5Schedule() {
             ))}
           </div>
         )}
+        {setPinFields.length > 0 && (
+          <>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+              {setPinFields.map((f) => (
+                <span key={f.key} className="badge badge-neutral" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span className="muted" style={{ fontWeight: 400 }}>{f.label}:</span>
+                  <strong>{pinFieldDisplay(f.key, draft[f.key])}</strong>
+                  <button
+                    type="button"
+                    className="btn-unstyled"
+                    onClick={() => setPinField(f.key, "")}
+                    aria-label={`Remove ${f.label}: ${pinFieldDisplay(f.key, draft[f.key])}`}
+                    title={`Remove ${f.label}`}
+                    style={{ padding: 0, margin: 0, fontWeight: 700 }}
+                  >×</button>
+                </span>
+              ))}
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={addPin}
+                disabled={pinAddDisabled}
+                title={tankerNeedsVehicle
+                  ? "A refueler pin needs a vehicle too — pick the vehicle this tanker supports."
+                  : !draft.customer_id ? "Pick a customer first." : "Pin this mission"}
+              >+ Pin mission</button>
+              {tankerNeedsVehicle && (
+                <span className="muted" style={{ fontSize: 12.5 }}>a refueler pin needs a vehicle — pick one below</span>
+              )}
+            </div>
+            {unsetPinFields.length > 0 && <hr style={{ border: "none", borderTop: "1px solid var(--line, #dde2e8)", margin: "0 0 10px" }} />}
+          </>
+        )}
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <select className="table-input" value={draft.customer_id} onChange={(e) => setDraft({ ...draft, customer_id: e.target.value })}>
-            <option value="">— customer —</option>
-            {customers.filter((c) => c.included).map((c) => <option key={c.id} value={c.id}>#{c.priority_rank} {c.label}</option>)}
-          </select>
-          <select className="table-input" value={draft.asset_id} onChange={(e) => setDraft({ ...draft, asset_id: e.target.value })}>
-            <option value="">— any asset —</option>
-            {assets.filter((a) => a.available).map((a) => <option key={a.id} value={a.id}>{a.id} ({a.vehicle_type})</option>)}
-          </select>
-          <select className="table-input" value={draft.refueler_id} onChange={(e) => setDraft({ ...draft, refueler_id: e.target.value })}>
-            <option value="">— any refueler —</option>
-            {refuelers.filter((f) => f.available).map((f) => <option key={f.id} value={f.id}>{f.id}</option>)}
-          </select>
-          <select className="table-input" value={draft.package_type_id} onChange={(e) => setDraft({ ...draft, package_type_id: e.target.value })}>
-            <option value="">— any option —</option>
-            {packageTypes.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-          </select>
-          <select className="table-input" value={draft.source_warehouse_id} onChange={(e) => setDraft({ ...draft, source_warehouse_id: e.target.value })}>
-            <option value="">— any source —</option>
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
-          </select>
-          <button className="btn btn-primary btn-sm" onClick={addPin} disabled={!draft.customer_id}>+ Pin mission</button>
+          {unsetPinFields.map((f) => {
+            const opts = pinFieldOptions(f.key);
+            return (
+              <select
+                key={f.key}
+                className="table-input"
+                value=""
+                disabled={opts.length === 0}
+                aria-label={f.label}
+                onChange={(e) => e.target.value && setPinField(f.key, e.target.value)}
+              >
+                <option value="">{opts.length === 0 ? `— no valid ${f.label.toLowerCase()} —` : f.placeholder}</option>
+                {opts.map((v) => <option key={v} value={v}>{pinFieldDisplay(f.key, v)}</option>)}
+              </select>
+            );
+          })}
+          {setPinFields.length === 0 && (
+            <button className="btn btn-primary btn-sm" onClick={addPin} disabled title="Pick a customer first.">+ Pin mission</button>
+          )}
         </div>
       </div>
 
