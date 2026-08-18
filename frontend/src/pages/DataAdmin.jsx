@@ -1,5 +1,73 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import EntityTable from "../components/EntityTable";
+import { api } from "../api";
+
+const SETTINGS_FIELDS = [
+  { key: "cycle_hours", label: "Execution cycle (hours)", help: "The daily flying/driving/sailing-hour budget every vehicle gets." },
+  { key: "handling_time_hours", label: "Handling time (hours)", help: "Fixed load/unload overhead added to every trip." },
+  { key: "refuel_overhead_hours", label: "Refuel overhead (hours)", help: "Extra time a trip costs when it needs a refueler rendezvous." },
+  { key: "default_daily_cap", label: "Default daily mission cap", help: "Starting value for the page-5 mission cap slider." },
+];
+
+function SettingsPanel() {
+  const [draft, setDraft] = useState(null);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    api.get("/settings/").then(setDraft).catch((e) => setError(e.message));
+  }, []);
+
+  async function save() {
+    setError(null);
+    setSaved(false);
+    try {
+      const payload = Object.fromEntries(SETTINGS_FIELDS.map((f) => [f.key, Number(draft[f.key])]));
+      setDraft(await api.put("/settings/", payload));
+      setSaved(true);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  return (
+    <div className="panel">
+      <div className="panel-title">Solver Settings</div>
+      <div className="panel-subtitle">Cycle-wide constants the feasibility pages and solver compute with. Edits apply to the next run — nothing is cached.</div>
+      {error && <div className="error-banner">{error}</div>}
+      {!draft && !error && <div className="loading-text">Loading…</div>}
+      {draft && (
+        <table>
+          <thead>
+            <tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
+          </thead>
+          <tbody>
+            {SETTINGS_FIELDS.map((f) => (
+              <tr key={f.key}>
+                <td>{f.label}</td>
+                <td>
+                  <input
+                    className="table-input"
+                    type="number"
+                    value={draft[f.key] ?? ""}
+                    onChange={(e) => { setSaved(false); setDraft({ ...draft, [f.key]: e.target.value }); }}
+                  />
+                </td>
+                <td className="muted" style={{ fontSize: 12.5 }}>{f.help}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {draft && (
+        <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
+          <button className="btn btn-primary btn-sm" onClick={save}>Save settings</button>
+          {saved && <span className="badge badge-good">saved</span>}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const TABS = [
   { key: "warehouses", label: "Warehouses" },
@@ -9,11 +77,13 @@ const TABS = [
   { key: "customers", label: "Customers" },
   { key: "package-types", label: "Package Types" },
   { key: "method-specs", label: "Transport Methods" },
-  { key: "method-restrictions", label: "Method Cargo Restrictions" },
+  { key: "asset-restrictions", label: "Asset Cargo Restrictions" },
   { key: "assets", label: "Transport Assets" },
   { key: "refuelers", label: "Refuelers" },
   { key: "warehouse-inventory", label: "Warehouse Inventory" },
   { key: "customer-bundle-items", label: "Customer Bundles" },
+  { key: "planned-missions", label: "Planned Missions" },
+  { key: "settings", label: "Solver Settings" },
 ];
 
 export default function DataAdmin() {
@@ -65,7 +135,7 @@ export default function DataAdmin() {
           idField="id"
           columns={[
             { key: "name", label: "Name", type: "text" },
-            { key: "warehouse_id", label: "Stationed At", type: "select", optionsEndpoint: "/api/warehouses/", optionValue: "id", optionLabel: "label", nullable: true },
+            { key: "warehouse_id", label: "Stationed At", type: "select", optionsEndpoint: "/warehouses/", optionValue: "id", optionLabel: "label", nullable: true },
             { key: "description", label: "Description", type: "text" },
           ]}
         />
@@ -84,12 +154,12 @@ export default function DataAdmin() {
       {tab === "allocation-policies" && (
         <EntityTable
           title="Mission Allocation Policies"
-          subtitle={'Minimum share of scheduled missions that must go to a customer type. E.g. target_pct = 0.40 means "at least 40% of missions go to this type."'}
+          subtitle={'Minimum share of scheduled missions that must go to a customer type. E.g. 40 means at least 40% of missions go to this type.'}
           endpoint="/allocation-policies/"
           idField="id"
           columns={[
-            { key: "customer_type_id", label: "Customer Type", type: "select", optionsEndpoint: "/api/customer-types/", optionValue: "id", optionLabel: "name" },
-            { key: "target_pct", label: "Target Share (0-1)", type: "number", step: "0.01" },
+            { key: "customer_type_id", label: "Customer Type", type: "select", optionsEndpoint: "/customer-types/", optionValue: "id", optionLabel: "name" },
+            { key: "target_pct", label: "Target Share (%)", type: "number", step: "1", scale: 100 },
           ]}
         />
       )}
@@ -97,7 +167,7 @@ export default function DataAdmin() {
       {tab === "customers" && (
         <EntityTable
           title="Customers"
-          subtitle="Priority score = 0.6 × local weight + 0.4 × HQ weight."
+          subtitle="Priority rank: 1 = highest priority. The optimizer converts rank to weight (rank r of N gets weight N+1−r)."
           endpoint="/customers/"
           idField="id"
           columns={[
@@ -105,9 +175,9 @@ export default function DataAdmin() {
             { key: "label", label: "Label", type: "text" },
             { key: "lat", label: "Latitude", type: "number", step: "0.0001" },
             { key: "lon", label: "Longitude", type: "number", step: "0.0001" },
-            { key: "w", label: "Local Priority (1-10)", type: "number" },
-            { key: "h", label: "HQ Priority (1-10)", type: "number" },
-            { key: "customer_type_id", label: "Type", type: "select", optionsEndpoint: "/api/customer-types/", optionValue: "id", optionLabel: "name", nullable: true },
+            { key: "priority_rank", label: "Priority Rank (1 = top)", type: "number" },
+            { key: "included", label: "In Today's Plan", type: "checkbox" },
+            { key: "customer_type_id", label: "Type", type: "select", optionsEndpoint: "/customer-types/", optionValue: "id", optionLabel: "name", nullable: true },
           ]}
         />
       )}
@@ -143,15 +213,15 @@ export default function DataAdmin() {
         />
       )}
 
-      {tab === "method-restrictions" && (
+      {tab === "asset-restrictions" && (
         <EntityTable
-          title="Method Cargo Restrictions"
-          subtitle="A package type this method is NOT able to carry (e.g. Air can't carry Hazmat)."
-          endpoint="/method-restrictions/"
+          title="Asset Cargo Restrictions"
+          subtitle="A package type this specific vehicle is NOT able to carry. Per-vehicle, not per method — two ships can differ."
+          endpoint="/asset-restrictions/"
           idField="id"
           columns={[
-            { key: "method", label: "Method", type: "select", optionsEndpoint: "/api/method-specs/", optionValue: "method", optionLabel: "method" },
-            { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/api/package-types/", optionValue: "id", optionLabel: "name" },
+            { key: "asset_id", label: "Asset", type: "select", optionsEndpoint: "/assets/", optionValue: "id", optionLabel: "id" },
+            { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/package-types/", optionValue: "id", optionLabel: "name" },
           ]}
         />
       )}
@@ -164,9 +234,11 @@ export default function DataAdmin() {
           idField="id"
           columns={[
             { key: "id", label: "ID", type: "text", readOnlyOnEdit: true },
-            { key: "home_warehouse_id", label: "Home Warehouse", type: "select", optionsEndpoint: "/api/warehouses/", optionValue: "id", optionLabel: "label" },
-            { key: "method", label: "Method", type: "select", optionsEndpoint: "/api/method-specs/", optionValue: "method", optionLabel: "method" },
-            { key: "team_id", label: "Owning Team", type: "select", optionsEndpoint: "/api/teams/", optionValue: "id", optionLabel: "name", nullable: true },
+            { key: "home_warehouse_id", label: "Home Warehouse", type: "select", optionsEndpoint: "/warehouses/", optionValue: "id", optionLabel: "label" },
+            { key: "method", label: "Method", type: "select", optionsEndpoint: "/method-specs/", optionValue: "method", optionLabel: "method" },
+            { key: "vehicle_type", label: "Vehicle Type", type: "text" },
+            { key: "available", label: "In Service", type: "checkbox" },
+            { key: "team_id", label: "Owning Team", type: "select", optionsEndpoint: "/teams/", optionValue: "id", optionLabel: "name", nullable: true },
           ]}
         />
       )}
@@ -179,8 +251,10 @@ export default function DataAdmin() {
           idField="id"
           columns={[
             { key: "id", label: "ID", type: "text", readOnlyOnEdit: true },
-            { key: "home_warehouse_id", label: "Home Warehouse", type: "select", optionsEndpoint: "/api/warehouses/", optionValue: "id", optionLabel: "label" },
-            { key: "team_id", label: "Owning Team", type: "select", optionsEndpoint: "/api/teams/", optionValue: "id", optionLabel: "name", nullable: true },
+            { key: "home_warehouse_id", label: "Home Warehouse", type: "select", optionsEndpoint: "/warehouses/", optionValue: "id", optionLabel: "label" },
+            { key: "vehicle_type", label: "Vehicle Type", type: "text" },
+            { key: "available", label: "In Service", type: "checkbox" },
+            { key: "team_id", label: "Owning Team", type: "select", optionsEndpoint: "/teams/", optionValue: "id", optionLabel: "name", nullable: true },
             { key: "extension_mi", label: "Range Extension (mi)", type: "number" },
             { key: "self_range_mi", label: "Self Range to Rendezvous (mi)", type: "number" },
           ]}
@@ -194,8 +268,8 @@ export default function DataAdmin() {
           endpoint="/warehouse-inventory/"
           idField="id"
           columns={[
-            { key: "warehouse_id", label: "Warehouse", type: "select", optionsEndpoint: "/api/warehouses/", optionValue: "id", optionLabel: "label" },
-            { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/api/package-types/", optionValue: "id", optionLabel: "name" },
+            { key: "warehouse_id", label: "Warehouse", type: "select", optionsEndpoint: "/warehouses/", optionValue: "id", optionLabel: "label" },
+            { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/package-types/", optionValue: "id", optionLabel: "name" },
             { key: "qty", label: "Qty", type: "number" },
           ]}
         />
@@ -204,16 +278,34 @@ export default function DataAdmin() {
       {tab === "customer-bundle-items" && (
         <EntityTable
           title="Customer Bundles"
-          subtitle="Which packages, and how many, fully satisfy each customer. A customer isn't satisfied until every line arrives."
+          subtitle="Package options per customer. Lines are alternatives — fully delivering any one option satisfies the customer."
           endpoint="/customer-bundle-items/"
           idField="id"
           columns={[
-            { key: "customer_id", label: "Customer", type: "select", optionsEndpoint: "/api/customers/", optionValue: "id", optionLabel: "label" },
-            { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/api/package-types/", optionValue: "id", optionLabel: "name" },
+            { key: "customer_id", label: "Customer", type: "select", optionsEndpoint: "/customers/", optionValue: "id", optionLabel: "label" },
+            { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/package-types/", optionValue: "id", optionLabel: "name" },
             { key: "qty_needed", label: "Qty Needed", type: "number" },
           ]}
         />
       )}
+
+      {tab === "planned-missions" && (
+        <EntityTable
+          title="Planned Missions"
+          subtitle="Human-pinned missions for today. Only Customer is required — anything left blank stays the optimizer's choice. Pins are hard constraints: they count against the cap and quotas, and conflicts make the run refuse with an explanation."
+          endpoint="/planned-missions/"
+          idField="id"
+          columns={[
+            { key: "customer_id", label: "Customer", type: "select", optionsEndpoint: "/customers/", optionValue: "id", optionLabel: "label" },
+            { key: "asset_id", label: "Asset (optional)", type: "select", optionsEndpoint: "/assets/", optionValue: "id", optionLabel: "id", nullable: true },
+            { key: "refueler_id", label: "Refueler (optional)", type: "select", optionsEndpoint: "/refuelers/", optionValue: "id", optionLabel: "id", nullable: true },
+            { key: "package_type_id", label: "Option (optional)", type: "select", optionsEndpoint: "/package-types/", optionValue: "id", optionLabel: "name", nullable: true },
+            { key: "source_warehouse_id", label: "Source (optional)", type: "select", optionsEndpoint: "/warehouses/", optionValue: "id", optionLabel: "label", nullable: true },
+          ]}
+        />
+      )}
+
+      {tab === "settings" && <SettingsPanel />}
     </div>
   );
 }

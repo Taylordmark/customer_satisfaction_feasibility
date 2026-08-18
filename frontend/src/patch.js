@@ -1,3 +1,6 @@
+// Small local PATCH helper mirroring api.js's request/error-handling pattern.
+// api.js is owned by another agent and only exposes get/post/put/del, so
+// partial-update (PATCH) calls live here instead of being added there.
 const BASE = "/api";
 
 function formatDetail(detail) {
@@ -13,10 +16,11 @@ function formatDetail(detail) {
   return detail;
 }
 
-async function request(path, options = {}) {
+export async function patch(path, data) {
   const res = await fetch(`${BASE}${path}`, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    ...options,
+    body: JSON.stringify(data),
   });
   if (!res.ok) {
     let detail = res.statusText;
@@ -24,17 +28,10 @@ async function request(path, options = {}) {
       const body = await res.json();
       detail = formatDetail(body.detail) || detail;
     } catch {
-      // ignore
+      // ignore — no JSON body
     }
     throw new Error(detail);
   }
   if (res.status === 204) return null;
   return res.json();
 }
-
-export const api = {
-  get: (path) => request(path),
-  post: (path, data) => request(path, { method: "POST", body: JSON.stringify(data) }),
-  put: (path, data) => request(path, { method: "PUT", body: JSON.stringify(data) }),
-  del: (path) => request(path, { method: "DELETE" }),
-};

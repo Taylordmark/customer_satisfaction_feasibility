@@ -138,6 +138,7 @@ input, select, textarea {
 
 .main-content {
   flex: 1;
+  min-width: 0; /* lets panels scroll horizontally instead of widening the page */
   padding: 36px 44px;
   max-width: 1200px;
 }
@@ -165,6 +166,7 @@ input, select, textarea {
   box-shadow: var(--shadow);
   padding: 20px 22px;
   margin-bottom: 18px;
+  overflow-x: auto; /* wide tables scroll inside the panel instead of clipping */
 }
 
 .panel-title {
@@ -250,6 +252,44 @@ tr:last-child td { border-bottom: none; }
 
 .row-actions { display: flex; gap: 6px; }
 
+/* ---------- Unstyled interactive elements ---------- */
+/* Turns a <button> back into something that looks like the span/div it
+   replaces. Deliberately does not set padding/margin so a combined
+   `.badge .btn-unstyled` element keeps the badge's own padding. */
+.btn-unstyled {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: inherit;
+}
+.btn-unstyled:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* A <button> that should look exactly like a `.panel` card (e.g. a
+   selectable mode card) rather than a native button. */
+.card-btn-reset {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  margin: 0;
+}
+
+/* Visible keyboard-focus indicator for all interactive elements. */
+:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
 /* ---------- Misc ---------- */
 .muted { color: var(--muted); }
 .error-banner {
@@ -259,6 +299,39 @@ tr:last-child td { border-bottom: none; }
   border-radius: 8px;
   font-size: 13.5px;
   margin-bottom: 14px;
+}
+.warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--warn-tint);
+  color: var(--warn);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  margin-bottom: 14px;
+}
+.stale-banner {
+  background: var(--warn-tint);
+  color: var(--warn);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+.inline-warning {
+  background: var(--bad-tint);
+  color: var(--bad);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-top: 8px;
+  font-weight: 600;
+}
+.results-dim {
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
 }
 .loading-text { color: var(--muted); font-size: 13.5px; padding: 20px 0; }
 

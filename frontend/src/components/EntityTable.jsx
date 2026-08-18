@@ -11,6 +11,9 @@ import { api } from "../api";
  *   nullable?: bool,            // select allows an empty/"none" choice
  *   step?: string,              // for number inputs, e.g. "0.01"
  *   readOnlyOnEdit?: bool,      // e.g. primary keys
+ *   scale?: number,             // display-transform: shown/edited value = stored * scale;
+ *                               // submitted value = input / scale (e.g. scale: 100 to edit a
+ *                               // stored 0-1 fraction as a 0-100 percent)
  * }]
  */
 export default function EntityTable({ title, subtitle, endpoint, columns, idField = "id" }) {
@@ -59,14 +62,45 @@ export default function EntityTable({ title, subtitle, endpoint, columns, idFiel
     setAdding(true);
   }
 
+  // Display-transform: shown/edited value = stored * col.scale, rounded to avoid float noise.
+  function scaleUp(col, v) {
+    if (!col.scale || v === "" || v === null || v === undefined) return v;
+    const n = Number(v) * col.scale;
+    return Math.round(n * 1e6) / 1e6;
+  }
+
+  function scaleDown(col, n) {
+    return col.scale ? n / col.scale : n;
+  }
+
   function castValue(col, raw) {
+    if (col.type === "checkbox") return raw === "" ? true : !!raw;
     if (raw === "" || raw === null || raw === undefined) return col.nullable ? null : raw;
-    if (col.type === "number") return Number(raw);
+    if (col.type === "number") return scaleDown(col, Number(raw));
     return raw;
+  }
+
+  // Non-nullable selects and number columns must have a value before submit — silently
+  // defaulting a foreign key or numeric field to empty/first-option saves wrong data
+  // confidently, so we block the save and name the offending fields instead.
+  function validateDraft(d) {
+    const missing = [];
+    columns.forEach((c) => {
+      if ((c.type === "select" || c.type === "number") && !c.nullable) {
+        const v = d[c.key];
+        if (v === "" || v === null || v === undefined) missing.push(c.label);
+      }
+    });
+    return missing;
   }
 
   async function saveNew() {
     setError(null);
+    const missing = validateDraft(newDraft);
+    if (missing.length) {
+      setError(`Required: ${missing.join(", ")}`);
+      return;
+    }
     const payload = {};
     columns.forEach((c) => (payload[c.key] = castValue(c, newDraft[c.key])));
     try {
@@ -81,12 +115,17 @@ export default function EntityTable({ title, subtitle, endpoint, columns, idFiel
   function startEdit(item) {
     setEditingId(item[idField]);
     const d = {};
-    columns.forEach((c) => (d[c.key] = item[c.key] ?? ""));
+    columns.forEach((c) => (d[c.key] = scaleUp(c, item[c.key] ?? "")));
     setDraft(d);
   }
 
   async function saveEdit(item) {
     setError(null);
+    const missing = validateDraft(draft);
+    if (missing.length) {
+      setError(`Required: ${missing.join(", ")}`);
+      return;
+    }
     const payload = {};
     columns.forEach((c) => (payload[c.key] = castValue(c, draft[c.key])));
     try {
@@ -110,20 +149,33 @@ export default function EntityTable({ title, subtitle, endpoint, columns, idFiel
   }
 
   function displayValue(col, value) {
+    if (col.type === "checkbox") {
+      return <span className={`badge ${value ? "badge-good" : "badge-bad"}`}>{value ? "yes" : "no"}</span>;
+    }
     if (col.type === "select" && optionsMap[col.key]) {
       const opt = optionsMap[col.key].find((o) => String(o[col.optionValue]) === String(value));
       return opt ? opt[col.optionLabel] : value === null || value === undefined ? "—" : value;
     }
     if (value === null || value === undefined || value === "") return "—";
+    if (col.type === "number" && col.scale) return String(scaleUp(col, value));
     return String(value);
   }
 
   function renderInput(col, value, onChange, isEditRow) {
+    if (col.type === "checkbox") {
+      return (
+        <input
+          type="checkbox"
+          checked={value === "" ? true : !!value}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+      );
+    }
     if (col.type === "select") {
       const opts = optionsMap[col.key] || [];
       return (
         <select className="table-input" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
-          {col.nullable && <option value="">— none —</option>}
+          <option value="">{col.nullable ? "— none —" : "— select —"}</option>
           {opts.map((o) => (
             <option key={o[col.optionValue]} value={o[col.optionValue]}>
               {o[col.optionLabel]}

@@ -4,7 +4,7 @@ there is no hardcoded dataset baked into the app logic. seed.py populates an
 initial example dataset once, on first boot, if the database is empty.
 """
 
-from sqlalchemy import Column, String, Float, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Float, Integer, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -66,16 +66,12 @@ class Customer(Base):
     label = Column(String, nullable=False)
     lat = Column(Float, nullable=False)
     lon = Column(Float, nullable=False)
-    w = Column(Float, nullable=False, default=5)     # local priority, 1-10
-    h = Column(Float, nullable=False, default=5)     # HQ priority, 1-10
+    priority_rank = Column(Integer, nullable=False, default=1)  # 1 = highest priority
+    included = Column(Boolean, nullable=False, default=True)    # in today's plan?
     customer_type_id = Column(Integer, ForeignKey("customer_types.id"), nullable=True)
 
     bundle_items = relationship("CustomerBundleItem", back_populates="customer", cascade="all, delete-orphan")
     customer_type = relationship("CustomerType", back_populates="customers")
-
-    @property
-    def score(self):
-        return round(0.6 * self.w + 0.4 * self.h, 2)
 
 
 class PackageType(Base):
@@ -96,20 +92,6 @@ class MethodSpec(Base):
     range_mi = Column(Float, nullable=False)
 
     assets = relationship("Asset", back_populates="method_spec")
-    restrictions = relationship("MethodRestriction", back_populates="method_spec", cascade="all, delete-orphan")
-
-
-class MethodRestriction(Base):
-    """A package type this method is NOT allowed to carry (i.e. the
-    transport's ability, or lack of it, to carry that package)."""
-    __tablename__ = "method_restrictions"
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    method = Column(String, ForeignKey("method_specs.method"), nullable=False)
-    package_type_id = Column(String, ForeignKey("package_types.id"), nullable=False)
-    __table_args__ = (UniqueConstraint("method", "package_type_id", name="uq_method_package"),)
-
-    method_spec = relationship("MethodSpec", back_populates="restrictions")
-    package_type = relationship("PackageType")
 
 
 class Asset(Base):
@@ -117,17 +99,35 @@ class Asset(Base):
     id = Column(String, primary_key=True)             # e.g. "Air-1"
     home_warehouse_id = Column(String, ForeignKey("warehouses.id"), nullable=False)
     method = Column(String, ForeignKey("method_specs.method"), nullable=False)
+    vehicle_type = Column(String, nullable=False, default="Unspecified")  # model name, e.g. "Albatross HL"
+    available = Column(Boolean, nullable=False, default=True)  # in service today?
     team_id = Column(Integer, ForeignKey("transport_control_teams.id"), nullable=True)
 
     home_warehouse = relationship("Warehouse", back_populates="assets")
     method_spec = relationship("MethodSpec", back_populates="assets")
     team = relationship("TransportControlTeam", back_populates="assets")
+    restrictions = relationship("AssetRestriction", back_populates="asset", cascade="all, delete-orphan")
+
+
+class AssetRestriction(Base):
+    """A package type this specific vehicle is NOT able to carry. Carrying
+    ability is per-asset, not per method — two ships can differ."""
+    __tablename__ = "asset_restrictions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    asset_id = Column(String, ForeignKey("assets.id"), nullable=False)
+    package_type_id = Column(String, ForeignKey("package_types.id"), nullable=False)
+    __table_args__ = (UniqueConstraint("asset_id", "package_type_id", name="uq_asset_package"),)
+
+    asset = relationship("Asset", back_populates="restrictions")
+    package_type = relationship("PackageType")
 
 
 class Refueler(Base):
     __tablename__ = "refuelers"
     id = Column(String, primary_key=True)              # e.g. "Tanker-1"
     home_warehouse_id = Column(String, ForeignKey("warehouses.id"), nullable=False)
+    vehicle_type = Column(String, nullable=False, default="Unspecified")  # model name, e.g. "Pelican KR"
+    available = Column(Boolean, nullable=False, default=True)  # in service today?
     team_id = Column(Integer, ForeignKey("transport_control_teams.id"), nullable=True)
     extension_mi = Column(Float, nullable=False)
     self_range_mi = Column(Float, nullable=False)
@@ -149,7 +149,8 @@ class WarehouseInventory(Base):
 
 
 class CustomerBundleItem(Base):
-    """Which packages, and how many, satisfy a given customer."""
+    """Package options for a customer — fully delivering any one option's
+    quantity satisfies them (lines are alternatives, not a checklist)."""
     __tablename__ = "customer_bundle_items"
     id = Column(Integer, primary_key=True, autoincrement=True)
     customer_id = Column(String, ForeignKey("customers.id"), nullable=False)
@@ -159,6 +160,28 @@ class CustomerBundleItem(Base):
 
     customer = relationship("Customer", back_populates="bundle_items")
     package_type = relationship("PackageType")
+
+
+class PlannedMission(Base):
+    """A human-pinned mission for today's plan, at any level of detail:
+    just a customer ("must be satisfied today"), through a specific asset,
+    refueler, bundle option, or source warehouse. Whatever is specified
+    becomes a hard constraint on the solve; whatever is left null stays the
+    optimizer's choice. Conflicting pins make the run refuse and explain
+    rather than being silently dropped."""
+    __tablename__ = "planned_missions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    customer_id = Column(String, ForeignKey("customers.id"), nullable=False)
+    asset_id = Column(String, ForeignKey("assets.id"), nullable=True)
+    refueler_id = Column(String, ForeignKey("refuelers.id"), nullable=True)
+    package_type_id = Column(String, ForeignKey("package_types.id"), nullable=True)
+    source_warehouse_id = Column(String, ForeignKey("warehouses.id"), nullable=True)
+
+    customer = relationship("Customer")
+    asset = relationship("Asset")
+    refueler = relationship("Refueler")
+    package_type = relationship("PackageType")
+    source_warehouse = relationship("Warehouse")
 
 
 class Settings(Base):

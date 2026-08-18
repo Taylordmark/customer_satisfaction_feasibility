@@ -1,12 +1,12 @@
-from typing import Optional, Dict
-from pydantic import BaseModel, ConfigDict
+from typing import Optional, Dict, List
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class WarehouseBase(BaseModel):
     id: str
     label: str
-    lat: float
-    lon: float
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
 
 
 class WarehouseCreate(WarehouseBase):
@@ -47,7 +47,7 @@ class CustomerTypeOut(CustomerTypeBase):
 
 class MissionAllocationPolicyBase(BaseModel):
     customer_type_id: int
-    target_pct: float  # 0-1
+    target_pct: float = Field(gt=0, le=1)  # 0-1
 
 
 class MissionAllocationPolicyCreate(MissionAllocationPolicyBase):
@@ -62,10 +62,10 @@ class MissionAllocationPolicyOut(MissionAllocationPolicyBase):
 class CustomerBase(BaseModel):
     id: str
     label: str
-    lat: float
-    lon: float
-    w: float
-    h: float
+    lat: float = Field(ge=-90, le=90)
+    lon: float = Field(ge=-180, le=180)
+    priority_rank: int = Field(ge=1)
+    included: bool = True
     customer_type_id: Optional[int] = None
 
 
@@ -74,15 +74,14 @@ class CustomerCreate(CustomerBase):
 
 
 class CustomerOut(CustomerBase):
-    score: float
     model_config = ConfigDict(from_attributes=True)
 
 
 class PackageTypeBase(BaseModel):
     id: str
     name: str
-    weight: float
-    volume: float
+    weight: float = Field(gt=0)
+    volume: float = Field(gt=0)
 
 
 class PackageTypeCreate(PackageTypeBase):
@@ -95,10 +94,10 @@ class PackageTypeOut(PackageTypeBase):
 
 class MethodSpecBase(BaseModel):
     method: str
-    speed_mph: float
-    weight_cap: float
-    vol_cap: float
-    range_mi: float
+    speed_mph: float = Field(gt=0)
+    weight_cap: float = Field(gt=0)
+    vol_cap: float = Field(gt=0)
+    range_mi: float = Field(gt=0)
 
 
 class MethodSpecCreate(MethodSpecBase):
@@ -109,16 +108,16 @@ class MethodSpecOut(MethodSpecBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MethodRestrictionBase(BaseModel):
-    method: str
+class AssetRestrictionBase(BaseModel):
+    asset_id: str
     package_type_id: str
 
 
-class MethodRestrictionCreate(MethodRestrictionBase):
+class AssetRestrictionCreate(AssetRestrictionBase):
     pass
 
 
-class MethodRestrictionOut(MethodRestrictionBase):
+class AssetRestrictionOut(AssetRestrictionBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 
@@ -127,6 +126,8 @@ class AssetBase(BaseModel):
     id: str
     home_warehouse_id: str
     method: str
+    vehicle_type: str = "Unspecified"
+    available: bool = True
     team_id: Optional[int] = None
 
 
@@ -141,9 +142,11 @@ class AssetOut(AssetBase):
 class RefuelerBase(BaseModel):
     id: str
     home_warehouse_id: str
+    vehicle_type: str = "Unspecified"
+    available: bool = True
     team_id: Optional[int] = None
-    extension_mi: float
-    self_range_mi: float
+    extension_mi: float = Field(ge=0)
+    self_range_mi: float = Field(ge=0)
 
 
 class RefuelerCreate(RefuelerBase):
@@ -157,7 +160,7 @@ class RefuelerOut(RefuelerBase):
 class WarehouseInventoryBase(BaseModel):
     warehouse_id: str
     package_type_id: str
-    qty: int
+    qty: int = Field(ge=0)
 
 
 class WarehouseInventoryCreate(WarehouseInventoryBase):
@@ -172,7 +175,7 @@ class WarehouseInventoryOut(WarehouseInventoryBase):
 class CustomerBundleItemBase(BaseModel):
     customer_id: str
     package_type_id: str
-    qty_needed: int
+    qty_needed: int = Field(ge=1)
 
 
 class CustomerBundleItemCreate(CustomerBundleItemBase):
@@ -185,15 +188,40 @@ class CustomerBundleItemOut(CustomerBundleItemBase):
 
 
 class SettingsBase(BaseModel):
-    cycle_hours: float
-    handling_time_hours: float
-    refuel_overhead_hours: float
-    default_daily_cap: int
+    cycle_hours: float = Field(gt=0)
+    handling_time_hours: float = Field(ge=0)
+    refuel_overhead_hours: float = Field(ge=0)
+    default_daily_cap: int = Field(ge=1)
 
 
 class SettingsOut(SettingsBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PlannedMissionBase(BaseModel):
+    customer_id: str
+    asset_id: Optional[str] = None
+    refueler_id: Optional[str] = None
+    package_type_id: Optional[str] = None
+    source_warehouse_id: Optional[str] = None
+
+
+class PlannedMissionCreate(PlannedMissionBase):
+    pass
+
+
+class PlannedMissionOut(PlannedMissionBase):
+    id: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class QuotaInput(BaseModel):
+    customer_type_id: int
+    target_pct: float = Field(gt=0, le=1)  # fraction 0-1 of the day's missions
+
+
 class SolveRequest(BaseModel):
-    daily_cap: int
+    daily_cap: int = Field(ge=1)
+    # per-type mission share floors set on the generate page;
+    # None means fall back to the stored Mission Allocation Policies
+    quotas: Optional[List[QuotaInput]] = None

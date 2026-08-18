@@ -27,10 +27,10 @@ def page3(db: Session = Depends(get_db)):
 @router.get("/page4")
 def page4(db: Session = Depends(get_db)):
     print("[api] GET /feasibility/page4")
-    return feasibility.page4_teams(feasibility.get_context(db))
+    return feasibility.page4_support(feasibility.get_context(db))
 
 
 @router.post("/page5")
 def page5(payload: schemas.SolveRequest, db: Session = Depends(get_db)):
-    print(f"[api] POST /feasibility/page5 daily_cap={payload.daily_cap}")
-    return solver.solve_daily_cap(db, payload.daily_cap)
+    print(f"[api] POST /feasibility/page5 daily_cap={payload.daily_cap} quotas={payload.quotas}")
+    return solver.solve_daily_cap(db, payload.daily_cap, payload.quotas)

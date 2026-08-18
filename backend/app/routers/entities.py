@@ -36,9 +36,9 @@ method_specs_router = make_crud_router(
     create_schema=schemas.MethodSpecCreate, out_schema=schemas.MethodSpecOut, id_type=str,
 )
 
-method_restrictions_router = make_crud_router(
-    prefix="/api/method-restrictions", tag="method-restrictions", model=models.MethodRestriction,
-    create_schema=schemas.MethodRestrictionCreate, out_schema=schemas.MethodRestrictionOut, id_type=int,
+asset_restrictions_router = make_crud_router(
+    prefix="/api/asset-restrictions", tag="asset-restrictions", model=models.AssetRestriction,
+    create_schema=schemas.AssetRestrictionCreate, out_schema=schemas.AssetRestrictionOut, id_type=int,
 )
 
 assets_router = make_crud_router(
@@ -56,6 +56,11 @@ warehouse_inventory_router = make_crud_router(
     create_schema=schemas.WarehouseInventoryCreate, out_schema=schemas.WarehouseInventoryOut, id_type=int,
 )
 
+planned_missions_router = make_crud_router(
+    prefix="/api/planned-missions", tag="planned-missions", model=models.PlannedMission,
+    create_schema=schemas.PlannedMissionCreate, out_schema=schemas.PlannedMissionOut, id_type=int,
+)
+
 customer_bundle_items_router = make_crud_router(
     prefix="/api/customer-bundle-items", tag="customer-bundle-items", model=models.CustomerBundleItem,
     create_schema=schemas.CustomerBundleItemCreate, out_schema=schemas.CustomerBundleItemOut, id_type=int,
@@ -63,6 +68,7 @@ customer_bundle_items_router = make_crud_router(
 
 all_crud_routers = [
     warehouses_router, teams_router, customer_types_router, allocation_policies_router,
-    customers_router, package_types_router, method_specs_router, method_restrictions_router,
+    customers_router, package_types_router, method_specs_router, asset_restrictions_router,
     assets_router, refuelers_router, warehouse_inventory_router, customer_bundle_items_router,
+    planned_missions_router,
 ]
