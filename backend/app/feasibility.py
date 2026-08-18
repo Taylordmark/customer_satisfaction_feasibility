@@ -32,10 +32,15 @@ def build_context(db: Session) -> dict:
     refuelers = {f.id: f for f in db.query(models.Refueler).all()}
     settings = db.query(models.Settings).first()
 
-    # per-asset carrying restrictions: disallowed[asset_id] = {package_type_id, ...}
-    disallowed = {a: set() for a in assets}
-    for r in db.query(models.AssetRestriction).all():
-        disallowed.setdefault(r.asset_id, set()).add(r.package_type_id)
+    # carrying restrictions are stored per vehicle type (Asset.vehicle_type),
+    # not per individual asset — expand them onto every asset of that type so
+    # the rest of the model can keep asking "can THIS asset carry K?" without
+    # knowing restrictions are type-level under the hood.
+    # disallowed[asset_id] = {package_type_id, ...}
+    barred_by_type = {}
+    for r in db.query(models.VehicleTypeRestriction).all():
+        barred_by_type.setdefault(r.vehicle_type, set()).add(r.package_type_id)
+    disallowed = {a_id: set(barred_by_type.get(a.vehicle_type, set())) for a_id, a in assets.items()}
 
     inventory = {}
     for inv in db.query(models.WarehouseInventory).all():
@@ -150,8 +155,9 @@ def page1_bundles(ctx: dict) -> list:
 # Page 2 — what transports can move the packages (carrying ability)
 # ---------------------------------------------------------------------------
 def page2_transports(ctx: dict) -> list:
-    """Carrying ability is per-vehicle, not per method — Sea-1 may take a
-    package Sea-2 can't."""
+    """Carrying ability is per-vehicle-type, not per method — a Manta-class
+    ship may take a package a Tiderunner-class ship can't, but two
+    Manta-class ships never differ."""
     out = []
     for k_id, pt in ctx["package_types"].items():
         eligible_assets, barred_assets = [], []

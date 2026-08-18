@@ -245,7 +245,7 @@ def _validate_pins(ctx, eligible, z_set, p_set, daily_cap):
                 bundle = bundles.get(c, {})
                 if bundle and barred.issuperset(bundle.keys()):
                     conflicts.append(f"Pin '{pin_desc}': {a} can't carry any of {label}'s "
-                                     "bundle options (all barred by asset restrictions).")
+                                     "bundle options (all barred by its vehicle type).")
                 else:
                     conflicts.append(f"Pin '{pin_desc}': {a} can't reach {label} "
                                      "(directly or with any available refueler).")

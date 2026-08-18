@@ -108,16 +108,16 @@ class MethodSpecOut(MethodSpecBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class AssetRestrictionBase(BaseModel):
-    asset_id: str
+class VehicleTypeRestrictionBase(BaseModel):
+    vehicle_type: str
     package_type_id: str
 
 
-class AssetRestrictionCreate(AssetRestrictionBase):
+class VehicleTypeRestrictionCreate(VehicleTypeRestrictionBase):
     pass
 
 
-class AssetRestrictionOut(AssetRestrictionBase):
+class VehicleTypeRestrictionOut(VehicleTypeRestrictionBase):
     id: int
     model_config = ConfigDict(from_attributes=True)
 

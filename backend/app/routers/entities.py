@@ -36,9 +36,9 @@ method_specs_router = make_crud_router(
     create_schema=schemas.MethodSpecCreate, out_schema=schemas.MethodSpecOut, id_type=str,
 )
 
-asset_restrictions_router = make_crud_router(
-    prefix="/api/asset-restrictions", tag="asset-restrictions", model=models.AssetRestriction,
-    create_schema=schemas.AssetRestrictionCreate, out_schema=schemas.AssetRestrictionOut, id_type=int,
+vehicle_type_restrictions_router = make_crud_router(
+    prefix="/api/vehicle-type-restrictions", tag="vehicle-type-restrictions", model=models.VehicleTypeRestriction,
+    create_schema=schemas.VehicleTypeRestrictionCreate, out_schema=schemas.VehicleTypeRestrictionOut, id_type=int,
 )
 
 assets_router = make_crud_router(
@@ -68,7 +68,7 @@ customer_bundle_items_router = make_crud_router(
 
 all_crud_routers = [
     warehouses_router, teams_router, customer_types_router, allocation_policies_router,
-    customers_router, package_types_router, method_specs_router, asset_restrictions_router,
+    customers_router, package_types_router, method_specs_router, vehicle_type_restrictions_router,
     assets_router, refuelers_router, warehouse_inventory_router, customer_bundle_items_router,
     planned_missions_router,
 ]

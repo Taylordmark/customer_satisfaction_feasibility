@@ -117,17 +117,20 @@ def seed_if_empty(db: Session):
         db.add(models.Asset(id=id_, home_warehouse_id=home, method=method, vehicle_type=vtype,
                              team_id=team_id_by_warehouse[home]))
 
-    # Carrying ability is per-vehicle. In this example fleet no aircraft is
-    # certified for Hazmat/Sensitive and no ship can take Fragile — but that's
-    # a property of each vehicle, not of the method: Ground-6 (an older truck)
-    # can't take Bulk even though every other ground vehicle can.
-    for id_, home, method, _vtype in asset_roster:
-        if method == "Air":
-            db.add(models.AssetRestriction(asset_id=id_, package_type_id="K3"))
-            db.add(models.AssetRestriction(asset_id=id_, package_type_id="K5"))
-        elif method == "Sea":
-            db.add(models.AssetRestriction(asset_id=id_, package_type_id="K2"))
-    db.add(models.AssetRestriction(asset_id="Ground-6", package_type_id="K4"))
+    # Carrying ability is per-vehicle-type: two vehicles of the same model
+    # (e.g. two Packmule 6 trucks) never differ. In this example fleet, both
+    # Air models (Albatross HL, Swiftwing 90) are barred from Hazmat and
+    # Sensitive, and both Sea models (Manta-class, Tiderunner-class) are
+    # barred from Fragile — but that's a property of the model, not the
+    # individual vehicle or the transport method.
+    vehicle_types_by_method = {}
+    for _id, _home, method, vtype in asset_roster:
+        vehicle_types_by_method.setdefault(method, set()).add(vtype)
+    for vtype in vehicle_types_by_method.get("Air", ()):
+        db.add(models.VehicleTypeRestriction(vehicle_type=vtype, package_type_id="K3"))
+        db.add(models.VehicleTypeRestriction(vehicle_type=vtype, package_type_id="K5"))
+    for vtype in vehicle_types_by_method.get("Sea", ()):
+        db.add(models.VehicleTypeRestriction(vehicle_type=vtype, package_type_id="K2"))
 
     refuelers = [
         ("Tanker-1", "W1", "Pelican KR", 1500, 2000),

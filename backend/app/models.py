@@ -106,19 +106,20 @@ class Asset(Base):
     home_warehouse = relationship("Warehouse", back_populates="assets")
     method_spec = relationship("MethodSpec", back_populates="assets")
     team = relationship("TransportControlTeam", back_populates="assets")
-    restrictions = relationship("AssetRestriction", back_populates="asset", cascade="all, delete-orphan")
 
 
-class AssetRestriction(Base):
-    """A package type this specific vehicle is NOT able to carry. Carrying
-    ability is per-asset, not per method — two ships can differ."""
-    __tablename__ = "asset_restrictions"
+class VehicleTypeRestriction(Base):
+    """A package type NO vehicle of this model (Asset.vehicle_type) is able
+    to carry. Carrying ability is per-vehicle-type, not per individual asset
+    or per method — two Packmule 6 trucks never differ, but a Packmule 6 and
+    a Longhaul 8x8 (both Ground) can. There is no VehicleType entity, so
+    vehicle_type is matched as the free-text string it is on Asset."""
+    __tablename__ = "vehicle_type_restrictions"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    asset_id = Column(String, ForeignKey("assets.id"), nullable=False)
+    vehicle_type = Column(String, nullable=False)
     package_type_id = Column(String, ForeignKey("package_types.id"), nullable=False)
-    __table_args__ = (UniqueConstraint("asset_id", "package_type_id", name="uq_asset_package"),)
+    __table_args__ = (UniqueConstraint("vehicle_type", "package_type_id", name="uq_vehicletype_package"),)
 
-    asset = relationship("Asset", back_populates="restrictions")
     package_type = relationship("PackageType")
 
 

@@ -17,11 +17,11 @@ def test_duplicate_package_pins_reported_as_conflict(db):
 
 
 def test_option_pin_with_no_carrying_asset_is_a_conflict(db):
-    """Bar every asset that could reach C16 within cycle from carrying K1,
-    then pin K1 (no asset specified) to C16 -- nothing could ever carry it."""
-    ctx_assets = db.query(models.Asset).all()
-    for a in ctx_assets:
-        db.add(models.AssetRestriction(asset_id=a.id, package_type_id="K1"))
+    """Bar every vehicle type from carrying K1, then pin K1 (no asset
+    specified) to C16 -- nothing could ever carry it."""
+    vehicle_types = {a.vehicle_type for a in db.query(models.Asset).all()}
+    for vtype in vehicle_types:
+        db.add(models.VehicleTypeRestriction(vehicle_type=vtype, package_type_id="K1"))
     db.add(models.PlannedMission(customer_id="C16", package_type_id="K1"))
     db.commit()
 
