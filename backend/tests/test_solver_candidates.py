@@ -18,14 +18,16 @@ def test_asset_barred_from_every_bundle_option_is_pruned(db):
 
 
 def test_pin_conflict_distinguishes_cant_carry_from_cant_reach(db):
-    """Bar Air-2 (based at W1, same as C16's easy Air-1) from both of C16's
-    bundle options, then pin Air-2 to C16. Air-1 (untouched) still reaches
-    C16 within the cycle, so C16 is NOT globally unreachable -- the pin
-    failure is specifically that Air-2 can't carry anything C16 wants, and
-    the conflict message must say so, not claim Air-2 can't reach C16
-    (which it physically can)."""
-    db.add(models.AssetRestriction(asset_id="Air-2", package_type_id="K1"))
-    db.add(models.AssetRestriction(asset_id="Air-2", package_type_id="K2"))
+    """Bar Air-2's vehicle type from both of C16's bundle options, then pin
+    Air-2 to C16. Air-1 (based at W1 like Air-2, but a different vehicle
+    type and untouched by the restriction) still reaches C16 within the
+    cycle, so C16 is NOT globally unreachable -- the pin failure is
+    specifically that Air-2 can't carry anything C16 wants, and the
+    conflict message must say so, not claim Air-2 can't reach C16 (which
+    it physically can)."""
+    air2_vtype = db.get(models.Asset, "Air-2").vehicle_type
+    db.add(models.VehicleTypeRestriction(vehicle_type=air2_vtype, package_type_id="K1"))
+    db.add(models.VehicleTypeRestriction(vehicle_type=air2_vtype, package_type_id="K2"))
     db.add(models.PlannedMission(customer_id="C16", asset_id="Air-2"))
     db.commit()
 

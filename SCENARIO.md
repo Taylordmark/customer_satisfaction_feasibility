@@ -6,8 +6,9 @@ An organization runs a distribution network: **warehouses** hold **package
 inventory**, **transport assets** (aircraft, trucks, ships) carry packages
 from warehouses to **customers**, and **refuelers** extend an asset's range
 when a customer is farther out than the asset can reach on its own fuel.
-Carrying ability is **per-vehicle**, not per transport method — one ship may
-be able to take a package another ship can't. Every asset is owned by a
+Carrying ability is **per-vehicle-type**, not per transport method or
+individual vehicle — one model of ship may be able to take a package another
+model can't, but two ships of the same model never differ. Every asset is owned by a
 **transport control team** — the organization that has tasking authority
 over it. Every customer has a **bundle of package options** — the options
 are alternatives, and fully delivering any one of them satisfies the
@@ -60,10 +61,11 @@ constraint that turned out to matter in practice:
    every line being required, the lines are now alternatives, and fully
    delivering any one option's quantity satisfies the customer. The solver
    picks which option; satisfaction is still all-or-nothing per option.
-10. **Per-vehicle carrying ability** — cargo restrictions moved from the
-    transport method to the individual asset. "Air can't carry hazmat" became
-    a per-aircraft property, so a fleet can contain a certified vehicle even
-    when its siblings are barred.
+10. **Per-vehicle-type carrying ability** — cargo restrictions moved from the
+    transport method to the vehicle type. "Air can't carry hazmat" became a
+    per-model property (e.g. a Swiftwing 90), so a fleet can contain a
+    certified model even when another model of the same method is barred —
+    but two vehicles of the same model never differ.
 11. **Rank-based priority and comparable objectives** — the blended w/h score
     became an explicit 1-n priority rank, and every schedule run now solves
     the model under three objectives side by side: most customers satisfied
@@ -93,7 +95,7 @@ that into an actual application:
 
 - **Every input is now editable through the UI**, not hardcoded — warehouses,
   teams, customer types, customers, package types, transport methods,
-  per-vehicle cargo restrictions, assets, refuelers, inventory, bundles, and
+  per-vehicle-type cargo restrictions, assets, refuelers, inventory, bundles, and
   the cycle-wide solver settings all live in a database and are fully
   editable through the tabbed Data section.
 - **The feasibility assessment is a guided, five-page drill-down** rather

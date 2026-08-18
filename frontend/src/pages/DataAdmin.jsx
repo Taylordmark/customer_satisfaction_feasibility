@@ -77,7 +77,7 @@ const TABS = [
   { key: "customers", label: "Customers" },
   { key: "package-types", label: "Package Types" },
   { key: "method-specs", label: "Transport Methods" },
-  { key: "asset-restrictions", label: "Asset Cargo Restrictions" },
+  { key: "vehicle-type-restrictions", label: "Vehicle Type Cargo Restrictions" },
   { key: "assets", label: "Transport Assets" },
   { key: "refuelers", label: "Refuelers" },
   { key: "warehouse-inventory", label: "Warehouse Inventory" },
@@ -220,14 +220,14 @@ export default function DataAdmin() {
         />
       )}
 
-      {tab === "asset-restrictions" && (
+      {tab === "vehicle-type-restrictions" && (
         <EntityTable
-          title="Asset Cargo Restrictions"
-          subtitle="A package type this specific vehicle is NOT able to carry. Per-vehicle, not per method — two ships can differ."
-          endpoint="/asset-restrictions/"
+          title="Vehicle Type Cargo Restrictions"
+          subtitle="A package type NO vehicle of this model is able to carry. Per-vehicle-type, not per individual vehicle or method — two vehicles of the same model never differ, but two models of the same method can. Vehicle type must match the text entered on the Transport Assets tab exactly."
+          endpoint="/vehicle-type-restrictions/"
           idField="id"
           columns={[
-            { key: "asset_id", label: "Asset", type: "select", optionsEndpoint: "/assets/", optionValue: "id", optionLabel: "id" },
+            { key: "vehicle_type", label: "Vehicle Type", type: "text" },
             { key: "package_type_id", label: "Package Type", type: "select", optionsEndpoint: "/package-types/", optionValue: "id", optionLabel: "name" },
           ]}
         />
